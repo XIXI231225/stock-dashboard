@@ -248,12 +248,45 @@ def write_notify(res, data: Path, out: Path, site_url: str):
     jdump(dict(date=res["date"], state="pending"), st_path)
 
 
+def selftest(data: Path):
+    """逐个检查各数据接口（用于排查），并用回补接口重抓状态里最近一天与快照比对。"""
+    log: list[str] = []
+    print("指数日期:", fetch.index_last_date(log))
+    S = load_state(data); last = S.dates[-1]
+    try:
+        print("交易日历:", fetch.trade_calendar(S.dates[-3], log))
+    except Exception as e:  # noqa: BLE001
+        print("交易日历失败", e)
+    codes = ["sh600000", "sz000001", "sz002242", "sh603200", "sz002487"]
+    for fn in (fetch.eastmoney_kline, fetch.tencent_kline):
+        for c in codes:
+            try:
+                rows = [r for r in fn(c, S.dates[-2], last) if r["date"] == last]
+                snap = None
+                p = data / f"snapshots/{last}.csv.gz"
+                if p.exists():
+                    with gzip.open(p, "rt", encoding="utf-8") as f:
+                        for r in csv.DictReader(f):
+                            if r["code"] == c:
+                                snap = r
+                print(fn.__name__, c, rows[0] if rows else "无", "| 快照收盘/前收", snap and (snap["close"], snap["preclose"]))
+            except Exception as e:  # noqa: BLE001
+                print(fn.__name__, c, "失败", repr(e))
+    try:
+        em = fetch.eastmoney_list(log, max_pages=2); print("东财列表(2页):", len(em))
+    except Exception as e:  # noqa: BLE001
+        print("东财列表失败", e)
+    print("\n".join(log))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True); ap.add_argument("--site", required=True)
     ap.add_argument("--build", action="store_true"); ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--date"); ap.add_argument("--out", default="out")
+    ap.add_argument("--date"); ap.add_argument("--out", default="out"); ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
+    if a.selftest:
+        selftest(Path(a.data)); return
     out = Path(a.out); out.mkdir(exist_ok=True)
     site_url = os.environ.get("SITE_URL", "")
     if a.build:

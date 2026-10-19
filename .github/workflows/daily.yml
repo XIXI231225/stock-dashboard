@@ -16,7 +16,7 @@ on:
       mode:
         description: "daily=正常更新；build=只重建网页；dry-run=只抓取检查不保存"
         type: choice
-        options: [daily, build, dry-run]
+        options: [daily, build, dry-run, selftest]
         default: daily
       date:
         description: "指定交易日 YYYY-MM-DD（一般留空）"
@@ -73,6 +73,7 @@ jobs:
           case "$MODE" in
             build)   python run_daily.py --data databranch --site _site --build | tee out/run.log
                      echo "deploy=yes" >> "$GITHUB_OUTPUT" ;;
+            selftest) python run_daily.py --data databranch --site _site --selftest | tee out/run.log ;;
             dry-run) python run_daily.py --data databranch --site _site --dry-run ${{ github.event.inputs.date && format('--date {0}', github.event.inputs.date) || '' }} | tee out/run.log ;;
             *)       python run_daily.py --data databranch --site _site ${{ github.event.inputs.date && format('--date {0}', github.event.inputs.date) || '' }} | tee out/run.log
                      [ "$(cat out/result.txt 2>/dev/null)" = "ok" ] && echo "deploy=yes" >> "$GITHUB_OUTPUT" || true ;;
@@ -123,7 +124,7 @@ jobs:
           fi
 
       - name: 保存运行日志到 logs 分支（便于远程排查，dry-run 和失败时）
-        if: always() && ((github.event.inputs.mode || 'daily') == 'dry-run' || failure())
+        if: always() && ((github.event.inputs.mode || 'daily') == 'dry-run' || (github.event.inputs.mode || 'daily') == 'selftest' || failure())
         run: |
           mkdir -p _logs && cp -r out/. _logs/ 2>/dev/null || true
           cd _logs && git init -q -b logs && git add -A && \

@@ -1,5 +1,7 @@
 # 股票数据看板（每日自动更新）
 
+**网页：https://xixi231225.github.io/stock-dashboard/** · 当前进度见 [STATE.md](STATE.md) · 策略规则见 [F版策略.md](F版策略.md)
+
 每个交易日收盘后，GitHub Actions 自动抓取沪深主板行情 → 计算指标 → 按 F版规则推进回测账户 → 更新网页（GitHub Pages）。有数据异常或策略信号时发邮件提醒。**电脑不用开机。**
 
 ## 网页内容
@@ -20,6 +22,7 @@
   - "上市满30个交易日" = 自身成交日数（含当天）≥ 31；
   - 20日涨幅 = 复权收盘 / 20 个**市场**交易日前的复权收盘 − 1（停牌期间沿用停牌前的值）。
 - 市场宽度 = 复权收盘 > 自身20日均线的主板股票占比，只报数值，不设过滤线。
+- 主板 ST 股涨跌幅自 2026-07-06 起按 10%（之前 5%），改动后回放结果不变。
 - 赚钱效应用"前一日 20日涨幅前10（剔除ST）"计算，可能和原报告里的数字略有出入（原代码这一项用的排名表没有留存）。只用于展示，不影响任何买卖。
 
 ## 数据源与容错
@@ -38,18 +41,29 @@
 - 🟡 提醒：明日主信号 / 补位信号、新进观察池、回测账户当日成交、跌停≥50家、市场宽度≤15%或≥85%
 - 发送方式：配置了 QQ 邮箱 Secrets 就发邮件；没配置就在仓库里开一个 Issue（GitHub 会把 Issue 发到你的注册邮箱）。
 
-## 部署（一次性）
+## 手动运行
+
+Actions → 每日数据看板 → Run workflow：
+
+| mode | 作用 |
+|---|---|
+| daily | 正常更新（默认，定时任务就是这个） |
+| build | 只用现有数据重建网页 |
+| dry-run | 抓取+检查，不保存；日志推到 `logs` 分支 |
+| selftest | 逐个测试各数据接口与回补接口；日志推到 `logs` 分支 |
+
+## 部署（一次性，已完成）
 
 1. 新建 GitHub 仓库（建议 Public：免费版 GitHub 只有公开仓库能用 Pages；注意网页内容任何拿到链接的人都能看到），把本文件夹全部内容推上去（包括 `.github` 目录）。
 2. 仓库 **Settings → Pages → Build and deployment → Source** 选 **GitHub Actions**。
 3. 仓库 **Settings → Secrets and variables → Actions** 新建 `QQ_EMAIL`、`QQ_SMTP_AUTH_CODE`、`EMAIL_TO`（和 ma3-cloud-report 项目同名同值；不配置则改用 Issue 提醒）。
 4. **Actions → 每日数据看板 → Run workflow**，mode 选 `build`：用种子数据发布第一版网页。
-5. 再手动跑一次 mode=`dry-run`：只抓取、检查，不保存，看日志确认三个数据源都能连上。
+5. 再手动跑一次 mode=`dry-run` 或 `selftest`：看 `logs` 分支里的日志，确认数据源都能连上。
 6. 之后每个交易日自动运行。网页地址：`https://<你的用户名>.github.io/<仓库名>/`
 
 ## 数据存放
 
-运行数据放在 `data` 分支（每次覆盖为一个提交，仓库不会越来越大）：`state/`（引擎状态+最近5天备份）、`history/market.csv`、`history/runs.jsonl`、`snapshots/每日行情.csv.gz`、`latest.json`、`notify_status.json`。首次运行时自动用 `seed/` 初始化。
+运行数据放在 `data` 分支（每次覆盖为一个提交，仓库不会越来越大）；dry-run/selftest/失败日志放在 `logs` 分支：`state/`（引擎状态+最近5天备份）、`history/market.csv`、`history/runs.jsonl`、`snapshots/每日行情.csv.gz`、`latest.json`、`notify_status.json`。首次运行时自动用 `seed/` 初始化。
 
 ## 本地命令
 
@@ -57,5 +71,6 @@
 pip install -r requirements.txt
 python run_daily.py --data seed --site _site --build      # 只用现有数据生成网页
 python run_daily.py --data <数据目录> --site _site --dry-run   # 抓取+检查，不保存
+python run_daily.py --data <数据目录> --site _site --selftest  # 逐个测试数据接口
 python tests/test_pipeline.py <all.pkl> <10-14种子> <10-16种子>  # 离线测试（需历史数据）
 ```

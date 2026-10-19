@@ -1,0 +1,14 @@
+指数日期: ('2026-10-19', '腾讯')
+交易日历: ['2026-10-14', '2026-10-15', '2026-10-16', '2026-10-19']
+eastmoney_kline sh600000 {'date': '2026-10-16', 'code': 'sh600000', 'name': '浦发银行', 'open': 9.6, 'close': 9.73, 'high': 9.79, 'low': 9.53, 'vol': 92294200.0, 'amt': 896160848.0, 'preclose': 9.64, 'fmv': None, 'tmv': None, 'src': '东财日K'} | 快照收盘/前收 ('9.73', '9.64')
+eastmoney_kline sz000001 {'date': '2026-10-16', 'code': 'sz000001', 'name': '平安银行', 'open': 11.41, 'close': 11.5, 'high': 11.63, 'low': 11.36, 'vol': 111185100.0, 'amt': 1281599063.32, 'preclose': 11.41, 'fmv': None, 'tmv': None, 'src': '东财日K'} | 快照收盘/前收 ('11.5', '11.41')
+eastmoney_kline sz002242 {'date': '2026-10-16', 'code': 'sz002242', 'name': '九阳股份', 'open': 16.86, 'close': 17.79, 'high': 17.81, 'low': 16.48, 'vol': 96844000.0, 'amt': 1695334415.21, 'preclose': 17.31, 'fmv': None, 'tmv': None, 'src': '东财日K'} | 快照收盘/前收 ('17.79', '17.31')
+eastmoney_kline sh603200 {'date': '2026-10-16', 'code': 'sh603200', 'name': '上海洗霸', 'open': 53.78, 'close': 55.51, 'high': 58.0, 'low': 52.16, 'vol': 32916800.0, 'amt': 1820165800.0, 'preclose': 53.35, 'fmv': None, 'tmv': None, 'src': '东财日K'} | 快照收盘/前收 ('55.51', '53.35')
+eastmoney_kline sz002487 {'date': '2026-10-16', 'code': 'sz002487', 'name': '大金重工', 'open': 35.76, 'close': 35.79, 'high': 37.55, 'low': 34.34, 'vol': 74068300.0, 'amt': 2653672616.51, 'preclose': 35.32, 'fmv': None, 'tmv': None, 'src': '东财日K'} | 快照收盘/前收 ('35.79', '35.32')
+tencent_kline sh600000 {'date': '2026-10-16', 'code': 'sh600000', 'name': '', 'open': 9.6, 'close': 9.73, 'high': 9.79, 'low': 9.53, 'vol': 92294200.0, 'amt': None, 'preclose': 9.64, 'fmv': None, 'tmv': None, 'src': '腾讯日K(前收=上一日收盘)'} | 快照收盘/前收 ('9.73', '9.64')
+tencent_kline sz000001 {'date': '2026-10-16', 'code': 'sz000001', 'name': '', 'open': 11.41, 'close': 11.5, 'high': 11.63, 'low': 11.36, 'vol': 111185100.0, 'amt': None, 'preclose': 11.41, 'fmv': None, 'tmv': None, 'src': '腾讯日K(前收=上一日收盘)'} | 快照收盘/前收 ('11.5', '11.41')
+tencent_kline sz002242 {'date': '2026-10-16', 'code': 'sz002242', 'name': '', 'open': 16.86, 'close': 17.79, 'high': 17.81, 'low': 16.48, 'vol': 96844000.0, 'amt': None, 'preclose': 17.31, 'fmv': None, 'tmv': None, 'src': '腾讯日K(前收=上一日收盘)'} | 快照收盘/前收 ('17.79', '17.31')
+tencent_kline sh603200 {'date': '2026-10-16', 'code': 'sh603200', 'name': '', 'open': 53.78, 'close': 55.51, 'high': 58.0, 'low': 52.16, 'vol': 32916800.0, 'amt': None, 'preclose': 53.35, 'fmv': None, 'tmv': None, 'src': '腾讯日K(前收=上一日收盘)'} | 快照收盘/前收 ('55.51', '53.35')
+tencent_kline sz002487 {'date': '2026-10-16', 'code': 'sz002487', 'name': '', 'open': 35.76, 'close': 35.79, 'high': 37.55, 'low': 34.34, 'vol': 74068300.0, 'amt': None, 'preclose': 35.32, 'fmv': None, 'tmv': None, 'src': '腾讯日K(前收=上一日收盘)'} | 快照收盘/前收 ('35.79', '35.32')
+东财列表(2页): 159
+东财: total=5562, 主板有成交159只

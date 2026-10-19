@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .core import r2, is_bad_name
+from .core import r2, is_bad_name, limit_pct
 
 
 def alert(level, title, detail=""):
@@ -22,7 +22,7 @@ def validate_bars(bars: dict, state, date: str, prev_n: int):
             dropped.append((code, f"高低开收矛盾 O{o} H{h} L{l} C{c}")); continue
         j = state.idx.get(code)
         nd = int(state.ndays[j]) if j is not None else 0
-        lim = 0.05 if is_bad_name(b.get("name", "")) else 0.10
+        lim = limit_pct(is_bad_name(b.get("name", "")), date)
         if nd >= 5:   # 新股前5日不设涨跌幅
             lu, ld = r2(pc * (1 + lim)), r2(pc * (1 - lim))
             if c > lu + 0.011 or c < ld - 0.011:

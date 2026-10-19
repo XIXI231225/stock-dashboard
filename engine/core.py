@@ -48,6 +48,15 @@ def ceil2(x: float) -> float:
     return math.ceil(x * 100 - 1e-7) / 100
 
 
+ST_LIMIT_10_FROM = "2026-07-06"   # 主板风险警示股涨跌幅由5%调整为10%（数据核实：该日起ST股出现±10%）
+
+
+def limit_pct(bad: bool, date: str) -> float:
+    if bad and date < ST_LIMIT_10_FROM:
+        return 0.05
+    return 0.10
+
+
 def is_bad_name(name: str) -> bool:
     return (not isinstance(name, str)) or ("ST" in name) or ("退" in name)
 
@@ -305,7 +314,7 @@ class State:
             if self.first_date[j] is None:
                 # 数据首日就存在的股票视为老股（上市日早于数据起点）
                 self.first_date[j] = "2000-01-01" if (not self.dates and FIRSTDAY_OLD) else date
-        lim = np.where(bad, 0.05, 0.10)
+        lim = np.where(bad & (date < ST_LIMIT_10_FROM), 0.05, 0.10)
         lu = np.array([r2(p * (1 + x)) if t else np.nan for p, x, t in zip(pc, lim, tr)])
         ld = np.array([r2(p * (1 - x)) if t else np.nan for p, x, t in zip(pc, lim, tr)])
         D = Day(date, tr, o, h, l, c, pc, vol, amt, fmv, bad, lu, ld, names)

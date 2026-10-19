@@ -5,7 +5,7 @@ import math
 
 import numpy as np
 
-from .core import ceil2, r2, CASH0, WIN, MCAP
+from .core import ceil2, r2, CASH0, WIN, MCAP, limit_pct
 
 REASON = {"TP": "盘中止盈5%", "TP_open": "开盘止盈", "TIME": "时间止损(3日)", "DEFER": "封跌停顺延卖出",
           "DEFER_open": "封跌停顺延(次日开盘卖)", "DELIST": "停牌/退市强平", "END": "期末未平仓"}
@@ -55,7 +55,7 @@ def make_latest(S, rep, alerts, quality, generated_at):
         pool.append(dict(code=a["code"], name=names.get(a["code"], ""), first_date=a["date"], rank_at=a["rank"],
                          r20_at=_n(a["r20"]), rank_now=rk30.get(a["code"]), r20_now=_n(r20[j]), close=_n(c, 3),
                          pct=_n(pct[j]), fmv=_n(fmv / 1e8, 1), days_left=left, fired=a["fired"], status=status,
-                         trig_hi=math.floor(c * 0.95 * 100 + 1e-7) / 100, trig_lo=r2(c * (0.95 if bad else 0.9)),
+                         trig_hi=math.floor(c * 0.95 * 100 + 1e-7) / 100, trig_lo=r2(c * (1 - limit_pct(bool(bad), D.date))),
                          traded=bool(D.tr[j])))
 
     sig = []
@@ -64,7 +64,7 @@ def make_latest(S, rep, alerts, quality, generated_at):
         sig.append(dict(kind=src, code=code, name=names.get(code, ""), sig_date=sd, close=_n(c, 3), pct=_n(pct[j]),
                         fmv=_n(D.fmv[j] / 1e8, 1), prev_rank=(prio if kind == 1 else None),
                         r20_at=(_n(-prio) if kind == 0 else None),
-                        next_lu=r2(c * (1.05 if D.bad[j] else 1.1)), next_ld=r2(c * (0.95 if D.bad[j] else 0.9))))
+                        next_lu=r2(c * (1 + limit_pct(bool(D.bad[j]), D.date))), next_ld=r2(c * (1 - limit_pct(bool(D.bad[j]), D.date)))))
 
     accts = {}
     for name, A in S.accounts.items():
@@ -75,7 +75,7 @@ def make_latest(S, rep, alerts, quality, generated_at):
         for code, P in A.pos.items():
             j = idx[code]; avg = P.cost / P.shares; c = P.lastc
             tp = ceil2(avg * 1.05)
-            nlu = r2(c * (1.05 if D.bad[j] else 1.1))
+            nlu = r2(c * (1 + limit_pct(bool(D.bad[j]), D.date)))
             nxt_add = None
             if P.lots < 3:
                 nxt_add = dict(trigger=round(avg * 0.97, 3), target_amt=round((2.0, 2.5)[P.lots - 1] * P.lot, 0))

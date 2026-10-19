@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>股票数据看板</title>
+<meta name="description" content="沪深主板 20日涨幅排名、市场宽度、跌停家数、F版策略观察池与回测账户，每个交易日收盘后自动更新">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M7 22l6-7 5 4 7-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <h1>股票数据看板</h1>
+        <div class="sub" id="asof">加载中…</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <span class="badge" id="status-badge">—</span>
+      <button class="ghost" id="theme-btn" title="切换深浅色">◐</button>
+    </div>
+  </div>
+  <nav class="wrap tabs" id="tabs">
+    <button data-tab="today" class="on">今日</button>
+    <button data-tab="signal">F版信号</button>
+    <button data-tab="account">回测账户</button>
+    <button data-tab="market">市场历史</button>
+    <button data-tab="quality">数据质量</button>
+    <button data-tab="rules">规则说明</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <!-- 今日 -->
+  <section id="tab-today" class="tab on">
+    <div id="alerts"></div>
+    <div class="tiles" id="market-tiles"></div>
+    <div class="card">
+      <div class="card-h">
+        <h2>20日涨幅排名 · 沪深主板</h2>
+        <div class="seg" id="top-n"><button data-n="10" class="on">前10</button><button data-n="20">前20</button><button data-n="30">前30</button></div>
+      </div>
+      <p class="hint">剔除 ST/退市、上市不满30个交易日；20日涨幅用复权价；MA3 = 最近三个交易日收盘价平均（原始价）。标记 <span class="pill pool">观察池</span> 的是首次进前二后仍在10日观察期内的票。</p>
+      <div class="tbl-wrap"><table id="top-table"></table></div>
+      <p class="hint"><a id="dl-snap" href="data/snapshot.csv" download>下载当日主板全量行情（CSV）</a></p>
+    </div>
+  </section>
+
+  <!-- F版信号 -->
+  <section id="tab-signal" class="tab">
+    <div class="card">
+      <h2>下一交易日开盘待执行</h2>
+      <div id="next-signals"></div>
+    </div>
+    <div class="card">
+      <h2>观察池（首次进入20日涨幅前二，观察10个交易日）</h2>
+      <p class="hint">观察期内任一天：收盘跌5%~10%（非一字跌停）、当天流通市值≥80亿、全市场主板非ST跌停家数&gt;3 → 次日开盘买（主信号）。每次进池只取第一个买点。</p>
+      <div class="tbl-wrap"><table id="pool-table"></table></div>
+    </div>
+    <div class="card">
+      <h2>补位候选（今日20日涨幅前20，不在观察期内）</h2>
+      <p class="hint">下一交易日若收盘跌5%~10%、非一字、市值≥80亿 → 再下一日开盘、且开盘时一只都没持有才买。</p>
+      <div class="tbl-wrap"><table id="fill-table"></table></div>
+    </div>
+  </section>
+
+  <!-- 回测账户 -->
+  <section id="tab-account" class="tab">
+    <div class="card-h page-h">
+      <div class="seg" id="acct-seg"></div>
+      <span class="hint">5万本金，2018-01-02 起按 F版规则逐日跑到今天；每天收盘后自动往前推进一天。</span>
+    </div>
+    <div class="tiles" id="acct-tiles"></div>
+    <div class="card">
+      <h2>当前持仓</h2>
+      <div id="holdings"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>资金曲线</h2><div class="legend" id="eq-legend"></div></div>
+      <div class="chart" id="eq-chart"></div>
+      <h3 class="mini">回撤</h3>
+      <div class="chart short" id="dd-chart"></div>
+    </div>
+    <div class="card">
+      <h2>逐年表现</h2>
+      <div class="tbl-wrap"><table id="year-table"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <h2>交易记录</h2>
+        <div class="seg" id="trade-filter"><button data-f="all" class="on">全部</button><button data-f="主信号">主信号</button><button data-f="补位">补位</button></div>
+      </div>
+      <div class="tbl-wrap tall"><table id="trade-table"></table></div>
+      <p class="hint"><a href="#" id="dl-trades">下载全部交易（CSV）</a></p>
+    </div>
+  </section>
+
+  <!-- 市场历史 -->
+  <section id="tab-market" class="tab">
+    <div class="card">
+      <div class="card-h"><h2>市场宽度（收盘价高于MA20的主板股票占比）</h2></div>
+      <p class="hint">只报数值，不设过滤线。</p>
+      <div class="chart" id="br-chart"></div>
+    </div>
+    <div class="card">
+      <h2>主板非ST收盘跌停家数</h2>
+      <p class="hint">主信号要求当天 &gt; 3 家。</p>
+      <div class="chart" id="ldn-chart"></div>
+    </div>
+    <div class="card">
+      <h2>赚钱效应 MA3（前一日前10名今日平均涨跌幅，3日均值）</h2>
+      <div class="chart" id="eff-chart"></div>
+    </div>
+  </section>
+
+  <!-- 数据质量 -->
+  <section id="tab-quality" class="tab">
+    <div class="card">
+      <h2>最近运行记录</h2>
+      <p class="hint">每次自动运行的数据来源、股票数量、剔除/补齐情况和告警。主源腾讯（逐只核对行情日期），新浪交叉核对和补缺，东方财富兜底；漏跑的交易日用个股日K回补并标注。</p>
+      <div id="runs"></div>
+    </div>
+  </section>
+
+  <!-- 规则 -->
+  <section id="tab-rules" class="tab">
+    <div class="card prose" id="rules"></div>
+  </section>
+</main>
+<footer class="wrap foot">数据来自公开行情接口，仅供研究记录，不构成投资建议。回测参数在同一段历史上选出，存在过拟合风险。</footer>
+<script src="app.js"></script>
+</body>
+</html>

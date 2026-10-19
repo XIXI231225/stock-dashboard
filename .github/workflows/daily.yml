@@ -1,0 +1,140 @@
+name: 每日数据看板
+
+on:
+  schedule:
+    # GitHub cron 用 UTC：北京时间 15:40 / 16:10 / 17:10 / 19:40，周一到周五。
+    # 已经更新过的交易日会自动跳过，所以多触发几次只是为了防止 GitHub 漏触发或接口临时故障。
+    - cron: "40 7 * * 1-5"
+    - cron: "10 8 * * 1-5"
+    - cron: "10 9 * * 1-5"
+    - cron: "40 11 * * 1-5"
+  push:
+    branches: [main]
+    paths: ["site/**", "engine/sitedata.py", "run_daily.py"]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "daily=正常更新；build=只重建网页；dry-run=只抓取检查不保存"
+        type: choice
+        options: [daily, build, dry-run]
+        default: daily
+      date:
+        description: "指定交易日 YYYY-MM-DD（一般留空）"
+        required: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  issues: write
+
+concurrency:
+  group: stock-dashboard
+  cancel-in-progress: false
+
+env:
+  TZ: Asia/Shanghai
+  SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      deploy: ${{ steps.run.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 取出数据分支（第一次运行时用种子数据初始化）
+        run: |
+          if git ls-remote --exit-code --heads origin data >/dev/null; then
+            git clone -q --depth 1 --branch data --single-branch \
+              "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" databranch
+          else
+            echo "数据分支不存在 → 用 seed/ 初始化"
+            mkdir databranch && cp -r seed/. databranch/
+          fi
+          mkdir -p out
+
+      - name: 运行
+        id: run
+        run: |
+          MODE="${{ github.event.inputs.mode || 'daily' }}"
+          [ "${{ github.event_name }}" = "push" ] && MODE=build
+          echo "mode=$MODE"
+          set -o pipefail
+          case "$MODE" in
+            build)   python run_daily.py --data databranch --site _site --build | tee out/run.log
+                     echo "deploy=yes" >> "$GITHUB_OUTPUT" ;;
+            dry-run) python run_daily.py --data databranch --site _site --dry-run ${{ github.event.inputs.date && format('--date {0}', github.event.inputs.date) || '' }} | tee out/run.log ;;
+            *)       python run_daily.py --data databranch --site _site ${{ github.event.inputs.date && format('--date {0}', github.event.inputs.date) || '' }} | tee out/run.log
+                     [ "$(cat out/result.txt 2>/dev/null)" = "ok" ] && echo "deploy=yes" >> "$GITHUB_OUTPUT" || true ;;
+          esac
+
+      - name: 保存数据分支
+        if: success() && (github.event.inputs.mode || 'daily') == 'daily' && github.event_name != 'push'
+        run: |
+          cd databranch
+          if [ -d .git ] && [ -z "$(git status --porcelain)" ]; then echo "数据无变化"; exit 0; fi
+          rm -rf .git
+          git init -q -b data
+          git add -A
+          git -c user.name="dashboard-bot" -c user.email="dashboard-bot@users.noreply.github.com" commit -qm "数据更新 $(date '+%F %T')"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+          echo "数据分支已推送"
+
+      - name: 发送提醒（数据已保存后才发）
+        if: success() && hashFiles('out/notify.json') != ''
+        env:
+          QQ_EMAIL: ${{ secrets.QQ_EMAIL }}
+          QQ_SMTP_AUTH_CODE: ${{ secrets.QQ_SMTP_AUTH_CODE }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m engine.notify out/notify.json | tee out/notify.log
+          if grep -qE "NOTIFY (smtp_accepted|issue_created)" out/notify.log; then
+            D=$(python -c "import json;print(json.load(open('out/notify.json'))['date'])")
+            echo "{\"date\":\"$D\",\"state\":\"sent\"}" > databranch/notify_status.json
+            cd databranch && git add -A && \
+              git -c user.name="dashboard-bot" -c user.email="dashboard-bot@users.noreply.github.com" commit -q --amend --no-edit && \
+              git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+          fi
+
+      - name: 失败提醒（只在当天最后一次定时任务或手动运行时发，避免重复）
+        if: failure()
+        env:
+          QQ_EMAIL: ${{ secrets.QQ_EMAIL }}
+          QQ_SMTP_AUTH_CODE: ${{ secrets.QQ_SMTP_AUTH_CODE }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          H=$(date +%H)
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$H" -ge 19 ]; then
+            python -m engine.notify --failure out/run.log
+          else
+            echo "北京时间 $H 点失败，后面还有定时任务会重试，先不发失败邮件"
+          fi
+
+      - name: 上传网页
+        if: success() && steps.run.outputs.deploy == 'yes'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: update
+    if: needs.update.outputs.deploy == 'yes'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4

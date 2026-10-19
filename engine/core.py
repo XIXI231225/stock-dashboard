@@ -28,10 +28,13 @@ FIRSTDAY_OLD = True
 LIST_MIN = 31      # 上市满 30 个交易日：自身成交日数（含当天）≥31，与原回测排名逐笔核对一致
 
 ACCOUNTS = {
-    # name: (主信号首笔比例, 补位首笔比例)
-    "稳健版": (0.20, 0.04),
-    "进取版": (0.30, 0.04),
+    # name: (主信号首笔比例, 补位首笔比例, 每次进池最多买几次主信号)
+    "稳健版": (0.20, 0.04, 1),            # F版原规则
+    "进取版": (0.30, 0.04, 1),            # F版原规则
+    "稳健版·二次买": (0.20, 0.04, 2),     # 对照：观察期内允许第2次主信号
+    "进取版·二次买": (0.30, 0.04, 2),
 }
+MAX_FIRES = max(v[2] for v in ACCOUNTS.values())
 ADDX = (2.0, 2.5)
 MAX_POS = 4
 
@@ -185,6 +188,7 @@ class Account:
     name: str
     main_pct: float
     fill_pct: float
+    max_fires: int = 1
     cash: float = CASH0
     prev_eq: float = CASH0
     pos: dict = field(default_factory=dict)       # code -> Pos
@@ -192,7 +196,7 @@ class Account:
     eq_hist: list = field(default_factory=list)   # [(date, eq, mv, npos)]
 
     def step(self, D: Day, idx: dict, pending: list, delisted: set):
-        """pending: 前一日收盘生成的信号 [(kind, prio, code, sig_date, src)]"""
+        """pending: 前一日收盘生成的信号 [(kind, prio, code, sig_date, src, nth)]，nth=该次进池第几次主信号"""
         events = []
         for code in list(self.pos):
             P = self.pos[code]; j = idx[code]
@@ -200,7 +204,9 @@ class Account:
             if P.exit is not None:
                 self.done.append(P.record()); events.append(("卖出", P.record())); del self.pos[code]
         n0 = len(self.pos); seen = set()
-        for kind, prio, code, sig, src in sorted(pending):
+        for kind, prio, code, sig, src, nth in sorted(pending):
+            if kind == 0 and nth > self.max_fires:
+                continue
             if code in seen or code in self.pos:
                 continue
             if len(self.pos) >= MAX_POS:
@@ -238,12 +244,12 @@ class Account:
         return events
 
     def to_json(self):
-        return dict(name=self.name, main_pct=self.main_pct, fill_pct=self.fill_pct, cash=self.cash, prev_eq=self.prev_eq,
+        return dict(name=self.name, main_pct=self.main_pct, fill_pct=self.fill_pct, max_fires=self.max_fires, cash=self.cash, prev_eq=self.prev_eq,
                     pos={k: asdict(v) for k, v in self.pos.items()}, done=self.done, eq_hist=self.eq_hist)
 
     @classmethod
     def from_json(cls, d):
-        a = cls(d["name"], d["main_pct"], d["fill_pct"], d["cash"], d["prev_eq"])
+        a = cls(d["name"], d["main_pct"], d["fill_pct"], max_fires=d.get("max_fires", 1), cash=d["cash"], prev_eq=d["prev_eq"])
         a.pos = {k: Pos(**{**v, "flows": [tuple(x) for x in v["flows"]]}) for k, v in d["pos"].items()}
         a.done = d["done"]; a.eq_hist = [tuple(x) for x in d["eq_hist"]]
         return a
@@ -270,7 +276,7 @@ class State:
         self.prev_top10: list[str] = []
         self.eff_hist: list[float] = []
         self.pending: list = []                  # 明日开盘待执行信号
-        self.accounts = {n: Account(n, m, f) for n, (m, f) in ACCOUNTS.items()}
+        self.accounts = {n: Account(n, m, f, k) for n, (m, f, k) in ACCOUNTS.items()}
 
     # ---------- 代码表扩展
     def _ensure(self, codes):
@@ -375,17 +381,22 @@ class State:
         for a in self.arrivals:
             if a["a"] < n:
                 covered.add(a["code"])
-                if not a["fired"]:
+                nf = a.get("nf", 1 if a["fired"] else 0)
+                if nf < MAX_FIRES:
                     j = self.idx[a["code"]]
                     if is_drop(j) and fmv[j] >= MCAP and ldn > 3:
-                        a["fired"] = True; a["fired_date"] = date
-                        main.append((0, -a["r20"], a["code"], date, "主信号"))
+                        nf += 1; a["nf"] = nf
+                        a.setdefault("fire_dates", ([a["fired_date"]] if a["fired"] else []))
+                        a["fire_dates"].append(date)
+                        if not a["fired"]:
+                            a["fired"] = True; a["fired_date"] = date
+                        main.append((0, -a["r20"], a["code"], date, "主信号", nf))
         fill = []
         for cd, rk in self.prev_rk30.items():
             if rk <= 20 and cd not in covered:
                 j = self.idx[cd]
                 if is_drop(j) and fmv[j] >= MCAP:
-                    fill.append((1, rk, cd, date, "补位"))
+                    fill.append((1, rk, cd, date, "补位", 0))
         # 新进观察池（今天首次进前二）
         recent = set(x for d in self.top2_hist[-LOOK:] for x in d)
         new_arr = []
@@ -428,6 +439,6 @@ class State:
         s.last_date = np.array(js["last_date"], dtype=object); s.first_date = np.array(js["first_date"], dtype=object); s.dates = js["dates"]
         s.top2_hist = js["top2_hist"]; s.arrivals = js["arrivals"]; s.prev_rk30 = js["prev_rk30"]
         s.prev_top10 = js["prev_top10"]; s.eff_hist = js["eff_hist"]
-        s.pending = [tuple(x) for x in js["pending"]]
+        s.pending = [tuple(x) if len(x) == 6 else tuple(x) + ((1 if x[0] == 0 else 0),) for x in js["pending"]]
         s.accounts = {k: Account.from_json(v) for k, v in js["accounts"].items()}
         return s

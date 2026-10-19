@@ -76,11 +76,12 @@
       const main = s.kind === "主信号";
       const pct0 = main ? 0 : 0;
       const plans = accts.map(([n, a]) => {
+        if (main && (s.nth || 1) > (a.max_fires || 1)) return `${n}：本次进池已买过1次，按F版原规则不买`;
         if (main) return `${n}：首笔 ≈ 总资产×${(a.main_pct * 100).toFixed(0)}% ≈ ${yuan(a.eq * a.main_pct)} 元`;
         const holds = a.holdings.map((h) => h.name).join("、");
         return a.holdings.length ? `${n}：开盘时持有 ${esc(holds)}，除非开盘就止盈卖完，否则按规则不买` : `${n}：空仓，可买；首笔 ≈ 总资产×${(a.fill_pct * 100).toFixed(0)}% ≈ ${yuan(a.eq * a.fill_pct)} 元（不足100股按100股）`;
       }).join("<br>");
-      return `<div class="sig"><div class="h"><span class="pill ${main ? "main" : "fill"}">${esc(s.kind)}</span>${stock(s.name, s.code)}</div>
+      return `<div class="sig"><div class="h"><span class="pill ${main ? "main" : "fill"}">${esc(s.kind)}${main && s.nth >= 2 ? "·第2次" : ""}</span>${stock(s.name, s.code)}</div>
         <div class="b">信号日 ${esc(s.sig_date)} 收盘 ${num(s.close)}（<span class="${cls(s.pct)}">${pct(s.pct, 2, true)}</span>），流通市值 ${num(s.fmv, 1)} 亿${s.prev_rank ? `，前一日20日涨幅排名第 ${s.prev_rank}` : ""}${s.r20_at != null ? `，进池时20日涨幅 ${pct(s.r20_at)}` : ""}</div>
         <div class="b">下一交易日开盘集合竞价买；开盘价 = 涨停 ${num(s.next_lu)} 或 跌停 ${num(s.next_ld)} 则放弃。</div>
         <div class="b">${plans}</div></div>`;
@@ -88,10 +89,10 @@
 
     const pool = L.pool;
     $("#pool-table").innerHTML = pool.length ? `<thead><tr><th class="l">股票</th><th class="l">状态</th><th>首次进前二</th><th>当时排名</th><th>今日排名</th><th>今日20日涨幅</th><th>收盘</th><th>今日</th><th>市值(亿)</th><th>剩余观察日</th><th>下一日触发区间（收盘）</th></tr></thead><tbody>` +
-      pool.map((p) => `<tr><td class="l">${stock(p.name, p.code)}</td><td class="l"><span class="pill ${p.fired ? "" : p.status.startsWith("有效") ? "ok" : "warn"}">${esc(p.status)}</span></td>
+      pool.map((p) => `<tr><td class="l">${stock(p.name, p.code)}</td><td class="l"><span class="pill ${(p.nf || 0) >= 2 ? "" : p.fired ? "pool" : p.status.startsWith("有效") ? "ok" : "warn"}">${esc(p.status)}</span></td>
       <td>${esc(p.first_date)}</td><td>${p.rank_at}</td><td>${p.rank_now ?? ">30"}</td><td class="${cls(p.r20_now)}">${pct(p.r20_now)}</td><td>${num(p.close)}</td>
       <td class="${cls(p.pct)}">${p.traded ? pct(p.pct, 2, true) : "停牌"}</td><td>${num(p.fmv, 1)}</td><td>${p.days_left}</td>
-      <td>${p.fired ? '<span class="muted">已用掉买点</span>' : `${num(p.trig_lo)} ~ ${num(p.trig_hi)}`}</td></tr>`).join("") + "</tbody>"
+      <td>${(p.nf || 0) >= 2 ? '<span class="muted">两次买点都已用掉</span>' : `${num(p.trig_lo)} ~ ${num(p.trig_hi)}${p.fired ? '<br><span class="muted">仅二次买账户</span>' : ""}`}</td></tr>`).join("") + "</tbody>"
       : `<tbody><tr><td class="l empty">观察池为空</td></tr></tbody>`;
 
     const fills = L.top30.filter((r) => r.rank <= 20 && !r.in_pool);
@@ -113,7 +114,10 @@
   }
   function renderAccount() {
     const a = D.latest.accounts[curAcct], H = D.accounts[curAcct];
-    const desc = `主信号首笔${(a.main_pct * 100).toFixed(0)}%（单票最多约${(a.main_pct * 250).toFixed(0)}%），补位首笔${(a.fill_pct * 100).toFixed(0)}%`;
+    const desc = `${(a.max_fires || 1) >= 2 ? "每次进池最多买2次主信号；" : "F版原规则（每次进池只买1次）；"}主信号首笔${(a.main_pct * 100).toFixed(0)}%（单票最多约${(a.main_pct * 250).toFixed(0)}%），补位首笔${(a.fill_pct * 100).toFixed(0)}%`;
+    $("#acct-compare").innerHTML = `<thead><tr><th class="l">账户</th><th class="l">规则</th><th>总资产</th><th>今日</th><th>累计收益</th><th>年化</th><th>最大回撤</th><th>交易笔数</th><th>胜率</th><th>持仓</th></tr></thead><tbody>` +
+      Object.entries(D.latest.accounts).map(([n, x]) => { const st = D.accounts[n].stats;
+        return `<tr class="${n === curAcct ? "cur" : ""}"><td class="l"><b>${esc(n)}</b></td><td class="l">${(x.max_fires || 1) >= 2 ? "最多买2次" : "F版原规则"}</td><td>${yuan(x.eq)}</td><td class="${cls(x.day_pnl)}">${x.day_pnl > 0 ? "+" : ""}${yuan(x.day_pnl)}</td><td class="${cls(x.total_ret)}">${pct(x.total_ret, 1, true)}</td><td>${pct(x.cagr)}</td><td>${pct(x.mdd)}</td><td>${st.n}</td><td>${pct(st.win)}</td><td class="l">${x.holdings.map((h) => esc(h.name)).join("、") || '<span class="muted">空仓</span>'}</td></tr>`; }).join("") + "</tbody>";
     $("#acct-tiles").innerHTML = [
       ["总资产", yuan(a.eq) + " 元", `今日 <span class="${cls(a.day_pnl)}">${a.day_pnl > 0 ? "+" : ""}${yuan(a.day_pnl)}</span> · 现金 ${yuan(a.cash)}`],
       ["累计收益", pct(a.total_ret, 1, true), `年化 ${pct(a.cagr, 1)} · ${desc}`],
@@ -203,7 +207,7 @@
         let d = "", started = false;
         s.values.forEach((v, i) => { if (v == null || !isFinite(v)) { started = false; return; } d += (started ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1); started = true; });
         if (area) g += `<path d="${d}L${x(n - 1)},${y(Math.min(0, hi))}L${x(0)},${y(Math.min(0, hi))}Z" fill="${s.color}" fill-opacity=".14"/>`;
-        g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-opacity="${s.opacity || 1}" stroke-linejoin="round"/>`;
+        g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-opacity="${s.opacity || 1}" stroke-linejoin="round"${s.dash ? ' stroke-dasharray="5 4"' : ""}/>`;
       }
     });
     g += `<line id="${id}-x" y1="${m.t}" y2="${m.t + ih}" stroke="${t3}" stroke-dasharray="3 3" visibility="hidden"/>`;
@@ -230,13 +234,15 @@
   }
   let rangesInit = {};
   function drawEquity() {
-    const names = Object.keys(D.accounts), colors = [cssVar("--s1"), cssVar("--s2")];
-    $("#eq-legend").innerHTML = names.map((n, i) => `<span><i style="background:${colors[i]}"></i>${esc(n)}</span>`).join("");
+    const names = Object.keys(D.accounts);
+    const colorOf = (n) => cssVar(n.startsWith("进取") ? "--s2" : "--s1"), dashOf = (n) => n.includes("二次买");
+    const colors = names.map(colorOf);
+    $("#eq-legend").innerHTML = names.map((n) => `<span><i class="${dashOf(n) ? "dash" : ""}" style="${dashOf(n) ? `border-top:2px dashed ${colorOf(n)}` : `background:${colorOf(n)}`}"></i>${esc(n)}</span>`).join("");
     if (!rangesInit.eq) { rangeBar("eq-chart", "all", drawEquity); rangesInit.eq = 1; }
     const all = D.accounts[names[0]].eq, k = Math.max(0, all.length - rangeN("eq-chart"));
     const dates = all.slice(k).map((x) => x[0]);
     const wan = (v, full) => full ? yuan(v) + " 元" : (v / 10000).toFixed(v >= 1e5 ? 0 : 1) + "万";
-    svgChart("eq-chart", { dates, fmt: wan, series: names.map((n, i) => ({ name: n, color: colors[i], values: D.accounts[n].eq.slice(k).map((x) => x[1]), width: n === curAcct ? 2 : 1.5, opacity: n === curAcct ? 1 : 0.5 })) });
+    svgChart("eq-chart", { dates, fmt: wan, series: names.map((n, i) => ({ name: n, color: colors[i], dash: dashOf(n), values: D.accounts[n].eq.slice(k).map((x) => x[1]), width: n === curAcct ? 2.2 : 1.4, opacity: n === curAcct ? 1 : 0.55 })) });
     const eq = D.accounts[curAcct].eq.map((x) => x[1]); let pk = -Infinity;
     const dd = eq.map((v) => { pk = Math.max(pk, v); return v / pk - 1; }).slice(k);
     svgChart("dd-chart", { dates, area: true, fmt: (v, full) => (v * 100).toFixed(full ? 1 : 0) + "%", series: [{ name: curAcct + " 回撤", color: colors[names.indexOf(curAcct)], values: dd, width: 1.5 }] });
@@ -279,6 +285,7 @@
   <li><b>补位信号</b>：前一日20日涨幅前20，当天跌5%~10%、非一字、市值≥80亿，且不在任何观察期内（不要求跌停家数）。</li>
   <li><b>买入</b>：次日开盘集合竞价；停牌、开盘价=涨停或跌停则放弃；股数四舍五入到100股（最少100股）。</li>
   <li><b>仓位</b>：稳健版主信号首笔=前一日收盘总资产×20%，补到40%、50%；进取版30%→60%→75%；补位首笔4%→8%→10%。最多同时4只；补位只在当天开盘（处理完开盘卖出后）一只都没持有时才买；同类信号按排名优先。</li>
+  <li><b>对照账户（二次买）</b>：稳健版·二次买、进取版·二次买 与原账户规则完全相同，唯一区别是同一次进池后允许第2次主信号买入（第3次起不买）。回测 2018~2026-10：稳健版 166,241→228,462、最大回撤 −25.1%→−20.7%；进取版 216,578→208,483、回撤 −33.6%→−35.3%。第2次买只有约50笔样本，结论待实盘观察。</li>
   <li><b>止盈</b>：买入次日起挂 均价×1.05（向上取到分）；开盘≥该价按开盘价成交，否则盘中最高价高于该价至少1分才算成交。</li>
   <li><b>补仓</b>：收盘≤均价×0.97 且未满3笔 → 按收盘价补到下一档；买入当天、一字跌停、收盘在跌停价不补。</li>
   <li><b>时间止损</b>：最后一次买入后满3个该股交易日仍未止盈 → 第3天收盘卖出；封跌停卖不出则顺延。</li>

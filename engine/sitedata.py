@@ -45,8 +45,12 @@ def make_latest(S, rep, alerts, quality, generated_at):
         j = idx[a["code"]]
         c = D.c[j] if D.tr[j] else S.lastc[j]
         fmv = D.fmv[j] if D.tr[j] else np.nan
-        if a["fired"]:
-            status = f"已触发（{a['fired_date']}）"
+        nf = a.get("nf", 1 if a["fired"] else 0)
+        fds = a.get("fire_dates") or ([a["fired_date"]] if a["fired"] else [])
+        if nf >= 2:
+            status = f"已触发2次（{'、'.join(fds)}）"
+        elif nf == 1:
+            status = f"已触发（{fds[0]}）· 二次买版本仍可再触发1次"
         elif np.isfinite(fmv) and fmv < MCAP:
             status = "市值<80亿，暂不满足"
         else:
@@ -54,14 +58,14 @@ def make_latest(S, rep, alerts, quality, generated_at):
         bad = D.bad[j]
         pool.append(dict(code=a["code"], name=names.get(a["code"], ""), first_date=a["date"], rank_at=a["rank"],
                          r20_at=_n(a["r20"]), rank_now=rk30.get(a["code"]), r20_now=_n(r20[j]), close=_n(c, 3),
-                         pct=_n(pct[j]), fmv=_n(fmv / 1e8, 1), days_left=left, fired=a["fired"], status=status,
+                         pct=_n(pct[j]), fmv=_n(fmv / 1e8, 1), days_left=left, fired=a["fired"], nf=nf, status=status,
                          trig_hi=math.floor(c * 0.95 * 100 + 1e-7) / 100, trig_lo=r2(c * (1 - limit_pct(bool(bad), D.date))),
                          traded=bool(D.tr[j])))
 
     sig = []
-    for kind, prio, code, sd, src in sorted(S.pending):
+    for kind, prio, code, sd, src, nth in sorted(S.pending):
         j = idx[code]; c = float(D.c[j])
-        sig.append(dict(kind=src, code=code, name=names.get(code, ""), sig_date=sd, close=_n(c, 3), pct=_n(pct[j]),
+        sig.append(dict(kind=src, nth=nth, code=code, name=names.get(code, ""), sig_date=sd, close=_n(c, 3), pct=_n(pct[j]),
                         fmv=_n(D.fmv[j] / 1e8, 1), prev_rank=(prio if kind == 1 else None),
                         r20_at=(_n(-prio) if kind == 0 else None),
                         next_lu=r2(c * (1 + limit_pct(bool(D.bad[j]), D.date))), next_ld=r2(c * (1 - limit_pct(bool(D.bad[j]), D.date)))))
@@ -97,7 +101,7 @@ def make_latest(S, rep, alerts, quality, generated_at):
                            total_ret=_n(eq[-1] / CASH0 - 1), cagr=_n((eq[-1] / CASH0) ** (1 / years) - 1 if years > 0 else None),
                            mdd=_n((eq / peak - 1).min()), dd_now=_n(eq[-1] / peak[-1] - 1),
                            day_pnl=_n(eq[-1] - (eq[-2] if len(eq) > 1 else CASH0), 2),
-                           main_pct=A.main_pct, fill_pct=A.fill_pct, holdings=hold, today=today_ev)
+                           main_pct=A.main_pct, fill_pct=A.fill_pct, max_fires=A.max_fires, holdings=hold, today=today_ev)
 
     return dict(date=D.date, generated_at=generated_at,
                 market=dict(n_traded=rep["n_traded"], ldn=rep["ldn"], breadth=_n(rep["breadth"]),

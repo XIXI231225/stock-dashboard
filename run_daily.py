@@ -94,7 +94,9 @@ def strategy_alerts(S, rep, latest):
     mains = [s for s in sig if s["kind"] == "主信号"]
     fills = [s for s in sig if s["kind"] == "补位"]
     if mains:
-        al.append(checks.alert("yellow", "明日开盘·主信号", "；".join(f"{s['name']} {s['code']}（今日{s['pct']:+.1%}，市值{s['fmv']}亿）" for s in mains)))
+        al.append(checks.alert("yellow", "明日开盘·主信号", "；".join(
+            f"{s['name']} {s['code']}（今日{s['pct']:+.1%}，市值{s['fmv']}亿" + ("，本次进池第2次，仅二次买账户买入" if s.get("nth", 1) >= 2 else "") + "）"
+            for s in mains)))
     if fills:
         al.append(checks.alert("yellow", "明日开盘·补位信号（开盘时空仓才买）",
                                "；".join(f"{s['name']} {s['code']}（前日排名{s['prev_rank']}，今日{s['pct']:+.1%}）" for s in fills)))

@@ -151,3 +151,7 @@ tbody tr:hover { background: var(--surface-2); }
 .tip b { margin-left: 10px; font-variant-numeric: tabular-nums; }
 
 .alert .sep { height: 8px; }
+
+.legend i.dash { background: none; height: 0; }
+tr.cur td { background: var(--surface-2); }
+.legend { flex-wrap: wrap; }

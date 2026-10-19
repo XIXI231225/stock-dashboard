@@ -122,6 +122,14 @@ jobs:
             echo "北京时间 $H 点失败，后面还有定时任务会重试，先不发失败邮件"
           fi
 
+      - name: 保存运行日志到 logs 分支（便于远程排查，dry-run 和失败时）
+        if: always() && ((github.event.inputs.mode || 'daily') == 'dry-run' || failure())
+        run: |
+          mkdir -p _logs && cp -r out/. _logs/ 2>/dev/null || true
+          cd _logs && git init -q -b logs && git add -A && \
+            git -c user.name="dashboard-bot" -c user.email="dashboard-bot@users.noreply.github.com" commit -qm "log $(date '+%F %T')" && \
+            git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" logs || true
+
       - name: 上传网页
         if: success() && steps.run.outputs.deploy == 'yes'
         uses: actions/upload-pages-artifact@v3

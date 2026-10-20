@@ -25,6 +25,7 @@
   </div>
   <nav class="wrap tabs" id="tabs">
     <button data-tab="today" class="on">今日</button>
+    <button data-tab="live">实盘</button>
     <button data-tab="signal">F版信号</button>
     <button data-tab="account">回测账户</button>
     <button data-tab="market">市场历史</button>
@@ -37,6 +38,7 @@
   <!-- 今日 -->
   <section id="tab-today" class="tab on">
     <div id="alerts"></div>
+    <div id="live-brief"></div>
     <div class="tiles" id="market-tiles"></div>
     <div class="card">
       <div class="card-h">
@@ -46,6 +48,34 @@
       <p class="hint">剔除 ST/退市、上市不满30个交易日；20日涨幅用复权价；MA3 = 最近三个交易日收盘价平均（原始价）。标记 <span class="pill pool">观察池</span> 的是首次进前二后仍在10日观察期内的票。</p>
       <div class="tbl-wrap"><table id="top-table"></table></div>
       <p class="hint"><a id="dl-snap" href="data/snapshot.csv" download>下载当日主板全量行情（CSV）</a></p>
+    </div>
+  </section>
+
+  <!-- 实盘 -->
+  <section id="tab-live" class="tab">
+    <div id="live-warn"></div>
+    <div class="tiles" id="live-tiles"></div>
+    <div class="card">
+      <h2>下一交易日操作（按F版规则）</h2>
+      <p class="hint">根据你同步过来的真实成交记录 + 当日收盘计算。止盈价 = 你的持仓均价×1.05（向上取到分）；补仓线 = 均价×0.97；时间止损从最后一次买入后按该股实际交易日计数。</p>
+      <div id="live-plan"></div>
+    </div>
+    <div class="card">
+      <h2>当前持仓</h2>
+      <div id="live-hold"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>资金曲线</h2><div class="legend" id="live-legend"></div></div>
+      <div class="chart" id="live-chart"></div>
+    </div>
+    <div class="card">
+      <h2>已平仓</h2>
+      <div class="tbl-wrap"><table id="live-closed"></table></div>
+    </div>
+    <div class="card">
+      <h2>成交记录</h2>
+      <p class="hint">来源 <code>live/trades.csv</code>。费用标 * 的是按F版费率估算（没填实际费用）。</p>
+      <div class="tbl-wrap tall"><table id="live-flows"></table></div>
     </div>
   </section>
 

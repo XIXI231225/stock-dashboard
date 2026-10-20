@@ -66,6 +66,60 @@
     $$("#top-n button").forEach((x) => x.classList.toggle("on", x === b)); renderTop(D.latest, +b.dataset.n);
   }));
 
+  // ---------- 实盘
+  const stepPill = (k) => `<span class="pill ${k === "卖出" || k === "时间止损" ? "warn" : k === "补仓" ? "fill" : k === "止盈" ? "ok" : ""}">${esc(k)}</span>`;
+  function livePlanHTML(R) {
+    const hold = R.plan.map((p) => `<div class="sig"><div class="h">${stock(p.name, p.code)}<span class="muted" style="font-weight:400;font-size:13px">持仓</span></div>` +
+      p.steps.map((s) => `<div class="b">${stepPill(s.kind)} ${esc(s.text)}</div>`).join("") + "</div>").join("");
+    const sigs = R.signals.map((s) => `<div class="sig"><div class="h"><span class="pill ${s.kind === "主信号" ? "main" : "fill"}">${esc(s.kind)}</span>${stock(s.name, s.code)}
+      <span class="pill ${s.buy ? "ok" : ""}">${s.buy ? "买入" : "不买"}</span></div>
+      <div class="b">${esc(s.text)}</div>
+      ${s.buy ? `<div class="b">开盘价 = 涨停 ${num(s.next_lu)} 或 跌停 ${num(s.next_ld)} 则放弃。</div>` : ""}</div>`).join("");
+    return (hold || sigs) ? hold + sigs : `<div class="empty">空仓，且今日收盘没有信号 → 下一交易日不操作。</div>`;
+  }
+  function renderLiveBrief(R) {
+    const el = $("#live-brief");
+    if (!R || !R.plan) { el.innerHTML = ""; return; }
+    el.innerHTML = `<div class="card live-brief"><div class="card-h"><h2>${esc(R.name)} · 下一交易日操作</h2><a href="#live" class="hint">实盘详情 →</a></div>${livePlanHTML(R)}</div>`;
+  }
+  function renderLive(R) {
+    if (!R || !R.plan) {
+      $("#live-plan").innerHTML = `<div class="empty">${R && R.error ? "实盘账户计算出错：" + esc(R.error) : "还没有实盘记录"}</div>`; return;
+    }
+    $("#live-warn").innerHTML = (R.warnings || []).length ? `<div class="alert yellow"><span class="ic">•</span><div>${R.warnings.map((w) => `<div class="dt">${esc(w)}</div>`).join("")}</div></div>` : "";
+    const hasCap = R.eq != null;
+    $("#live-tiles").innerHTML = [
+      ["总资产", hasCap ? yuan(R.eq) + " 元" : "—", hasCap ? `现金 ${yuan(R.cash)} · 持仓市值 ${yuan(R.mv)}${R.day_pnl != null ? ` · 今日 <span class="${cls(R.day_pnl)}">${R.day_pnl > 0 ? "+" : ""}${yuan(R.day_pnl)}</span>` : ""}` : `持仓市值 ${yuan(R.mv)} · 未设置开始资金`],
+      ["累计收益", hasCap ? pct(R.total_ret, 2, true) : "—", `${esc(R.start)} 起 · 开始资金 ${R.capital ? yuan(R.capital) + " 元" : "未设置"}`],
+      ["已平仓", `${R.n_closed} 笔`, `合计 <span class="${cls(R.pnl_closed)}">${R.pnl_closed > 0 ? "+" : ""}${yuan(R.pnl_closed)}</span> 元 · 胜率 ${pct(R.win)}`],
+      ["仓位规则", esc(R.sizing), `主信号首笔 ${(R.main_pct * 100).toFixed(0)}% · 补位首笔 ${(R.fill_pct * 100).toFixed(0)}% · ${R.max_fires >= 2 ? "每次进池最多买2次" : "F版原规则"}`],
+    ].map(([k, v, d]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
+    $("#live-plan").innerHTML = livePlanHTML(R);
+    $("#live-hold").innerHTML = R.holdings.length ? R.holdings.map((h) => `<div class="hold"><div class="h"><span><span class="pill ${h.src === "主信号" ? "main" : h.src === "补位" ? "fill" : ""}">${esc(h.src)}</span> ${stock(h.name, h.code)}</span>
+        <span class="${cls(h.pnl)}">${h.pnl > 0 ? "+" : ""}${yuan(h.pnl)} 元（${pct(h.ret, 2, true)}）</span></div>
+        <div class="kv"><div><span>持股</span>${h.shares} 股</div><div><span>持仓均价</span>${num(h.avg, 3)}</div><div><span>收盘（${esc(h.close_date || "")}）</span>${num(h.close)}</div><div><span>市值</span>${yuan(h.mv)}</div>
+        <div><span>止盈挂单（均价×1.05）</span>${num(h.tp)}${h.tp_reachable ? "" : `<br><span class="muted">明日涨停${num(h.next_lu)}，到不了</span>`}</div>
+        <div><span>已买笔数</span>${h.lots}/3${h.next_add ? `（收盘≤${num(h.next_add.trigger)} 补到约${yuan(h.next_add.target_amt)}元）` : ""}</div>
+        <div><span>时间止损</span>${h.cnt >= 3 ? "已到期，应卖出" : `再过 ${h.time_stop_in} 个交易日收盘（未止盈时）`}</div>
+        <div><span>首次买入 / 最后买入</span>${esc(h.entry)} / ${esc(h.last_buy)}</div>
+        <div><span>首档金额</span>${yuan(h.lot)} 元<br><span class="muted">${h.lot_basis === "规则比例" ? "按规则比例×前一日总资产" : "按实际首笔金额"}</span></div></div></div>`).join("") : `<div class="empty">空仓</div>`;
+    $("#live-closed").innerHTML = R.closed.length ? `<thead><tr><th class="l">来源</th><th class="l">股票</th><th>买入日</th><th>买入价</th><th>卖出日</th><th>卖出价</th><th>笔数</th><th>累计买入</th><th>净盈亏</th><th>收益率</th><th class="l">备注</th></tr></thead><tbody>` +
+      R.closed.map((t) => `<tr><td class="l"><span class="pill ${t.src === "主信号" ? "main" : t.src === "补位" ? "fill" : ""}">${esc(t.src)}</span></td><td class="l">${stock(t.name, t.code)}</td><td>${t.entry}</td><td>${num(t.entry_px)}</td><td>${t.exit}</td><td>${num(t.exit_px)}</td><td>${t.lots}</td><td>${yuan(t.invested)}</td><td class="${cls(t.pnl)}">${yuan(t.pnl)}</td><td class="${cls(t.ret)}">${pct(t.ret, 2, true)}</td><td class="l">${esc(t.note)}</td></tr>`).join("") + "</tbody>"
+      : `<tbody><tr><td class="l empty">还没有平仓记录</td></tr></tbody>`;
+    $("#live-flows").innerHTML = `<thead><tr><th>日期</th><th class="l">操作</th><th class="l">股票</th><th>价格</th><th>股数</th><th>金额</th><th>费用</th><th class="l">来源</th><th class="l">备注</th></tr></thead><tbody>` +
+      R.flows.map((f) => `<tr><td>${f.date}</td><td class="l">${esc(f.op)}</td><td class="l">${f.code ? stock(f.name, f.code) : "—"}</td><td>${f.px != null && f.code ? num(f.px) : "—"}</td><td>${f.shares ?? "—"}</td><td class="${cls(f.amt)}">${yuan(f.amt)}</td><td>${num(f.fee)}${f.est_fee ? "*" : ""}</td><td class="l">${esc(f.src)}</td><td class="l">${esc(f.note)}</td></tr>`).join("") + "</tbody>";
+    drawLive();
+  }
+  function drawLive() {
+    const R = D.live;
+    if (!R || !R.eq_hist || R.eq_hist.length < 2) { $("#live-chart").innerHTML = `<div class="empty">${R && R.eq == null ? "设置开始资金后显示资金曲线" : "满两个交易日后显示资金曲线"}</div>`; $("#live-chart").style.height = "auto"; return; }
+    $("#live-chart").style.height = "";
+    const dates = R.eq_hist.map((x) => x[0]);
+    const series = [{ name: R.name, color: cssVar("--s1"), values: R.eq_hist.map((x) => x[1] / R.eq_hist[0][1] - 1), width: 2.2 }];
+    $("#live-legend").innerHTML = series.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}（相对开始日）</span>`).join("");
+    svgChart("live-chart", { dates, zeroLine: true, fmt: (v, f) => (v * 100).toFixed(f ? 2 : 1) + "%", series });
+  }
+
   // ---------- 信号
   function renderSignal(L) {
     const accts = Object.entries(L.accounts);
@@ -261,6 +315,7 @@
   function redrawCharts() {
     if ($("#tab-account").classList.contains("on") && D.accounts) drawEquity();
     if ($("#tab-market").classList.contains("on") && D.market) drawMarket();
+    if ($("#tab-live").classList.contains("on") && D.live) drawLive();
   }
   let rsz; window.addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(redrawCharts, 150); });
 
@@ -305,6 +360,7 @@
   function lazy(t) {
     if (!D.latest) return;
     if (t === "signal" && !loaded.signal) { renderSignal(D.latest); loaded.signal = 1; }
+    if (t === "live") { if (D.live !== undefined) { if (!loaded.live) { renderLive(D.live); loaded.live = 1; } else drawLive(); } }
     if (t === "account") {
       const go = () => { if (!loaded.account) { renderAccountTabs(); renderAccount(); loaded.account = 1; } else drawEquity(); };
       D.accounts ? go() : getJSON("data/accounts.json").then((x) => { D.accounts = x; go(); });
@@ -317,6 +373,11 @@
     D.latest = L; renderToday(L);
     const t = (location.hash || "#today").slice(1);
     showTab($(`#tabs button[data-tab="${t}"]`) ? t : "today");
+    getJSON("data/live.json").catch(() => null).then((R) => {
+      D.live = R && Object.keys(R).length ? R : null;
+      renderLiveBrief(D.live);
+      if ($("#tab-live").classList.contains("on")) lazy("live");
+    });
   }).catch((e) => {
     $("#asof").textContent = "数据加载失败：" + e.message;
   });

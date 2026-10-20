@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from engine.core import State  # noqa: E402
-from engine import fetch, checks, sitedata, notify  # noqa: E402
+from engine import fetch, checks, sitedata, notify, live  # noqa: E402
 
 MARKET_COLS = ["date", "n_traded", "ldn", "breadth", "breadth_above", "breadth_valid", "eff", "eff_ma3", "top10"]
 
@@ -110,6 +110,16 @@ def strategy_alerts(S, rep, latest):
     return al
 
 
+def live_account(data: Path, latest=None):
+    """实盘账户（live/ 下的真实成交记录）。出错不影响看板其他部分。"""
+    try:
+        latest = latest or json.load(open(data / "latest.json", encoding="utf-8"))
+        return live.compute(ROOT, data, latest)
+    except Exception:  # noqa: BLE001
+        print("实盘账户计算失败\n" + traceback.format_exc())
+        return dict(error=traceback.format_exc()[-1500:])
+
+
 def build_site(data: Path, site: Path):
     """把静态页面 + 数据拷到 site 输出目录。"""
     if site.exists():
@@ -123,6 +133,8 @@ def build_site(data: Path, site: Path):
                rows=[[r["date"], int(r["ldn"]), float(r["breadth"]), float(r["eff_ma3"]) if r["eff_ma3"] else None,
                       int(r["n_traded"])] for r in rows]), d / "market.json")
     jdump(sitedata.make_accounts(S), d / "accounts.json")
+    L = live_account(data)
+    jdump(L or {}, d / "live.json")
     runs = []
     p = data / "history/runs.jsonl"
     if p.exists():
@@ -222,6 +234,10 @@ def run_daily(a):
     save_state(S, data)
     append_market(data, rep, S)
     write_snapshot(data, target, clean)
+    L = live_account(data, latest)
+    if L and not L.get("error"):
+        all_alerts += live.alerts(L)
+    latest["alerts"] = all_alerts
     jdump(latest, data / "latest.json")
     with open(data / "history/runs.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(dict(date=target, run_at=latest["generated_at"], sources=sources, stats=stats_all,

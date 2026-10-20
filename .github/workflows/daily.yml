@@ -10,7 +10,7 @@ on:
     - cron: "40 11 * * 1-5"
   push:
     branches: [main]
-    paths: ["site/**", "engine/sitedata.py", "run_daily.py"]
+    paths: ["site/**", "engine/sitedata.py", "engine/live.py", "run_daily.py", "live/**"]
   workflow_dispatch:
     inputs:
       mode:

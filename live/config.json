@@ -1,0 +1,8 @@
+{
+  "name": "实盘",
+  "start_date": "2026-10-20",
+  "capital": null,
+  "sizing": "稳健版",
+  "max_fires": 1,
+  "note": "capital = 开始记录时的账户总资产（元）；sizing = 稳健版/进取版（只影响主信号仓位）；max_fires = 每次进池最多买几次主信号（1=F版原规则）"
+}

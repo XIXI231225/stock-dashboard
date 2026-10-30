@@ -376,6 +376,7 @@
     getJSON("data/live.json").catch(() => null).then((R) => {
       D.live = R && Object.keys(R).length ? R : null;
       renderLiveBrief(D.live);
+      if (window.OPS) window.OPS.init(D);
       if ($("#tab-live").classList.contains("on")) lazy("live");
     });
   }).catch((e) => {

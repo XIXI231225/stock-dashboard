@@ -20,6 +20,7 @@
     </div>
     <div class="top-right">
       <span class="badge" id="status-badge">—</span>
+      <button class="ghost wide" id="update-btn" title="让 GitHub 现在就抓今天的收盘数据并更新网页">↻ 更新</button>
       <button class="ghost" id="theme-btn" title="切换深浅色">◐</button>
     </div>
   </div>
@@ -53,6 +54,7 @@
 
   <!-- 实盘 -->
   <section id="tab-live" class="tab">
+    <div class="card ops" id="ops-card"></div>
     <div id="live-warn"></div>
     <div class="tiles" id="live-tiles"></div>
     <div class="card">
@@ -166,6 +168,7 @@
   </section>
 </main>
 <footer class="wrap foot">数据来自公开行情接口，仅供研究记录，不构成投资建议。回测参数在同一段历史上选出，存在过拟合风险。</footer>
+<script src="ops.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -158,3 +158,44 @@ tr.cur td { background: var(--surface-2); }
 
 .live-brief { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
 .live-brief .card-h a { text-decoration: none; }
+
+/* ---------- 网页内记录实盘操作 */
+.ghost.wide { width: auto; padding: 0 10px; font-size: 13px; white-space: nowrap; }
+.ops { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.ops.busy { opacity: .6; pointer-events: none; }
+.opsf { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 12px; margin-top: 6px; }
+.opsf label, .opsb label { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--text-2); min-width: 0; }
+.opsf .w2 { grid-column: span 2; }
+.opsf .w3 { grid-column: 1 / -1; }
+.ops input, .ops select { font: inherit; font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 9px; min-width: 0; width: 100%; }
+.ops input:focus, .ops select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 0; border-color: var(--accent); }
+.ops .other { display: none; }
+.ops.is-other .other { display: flex; }
+.ops.is-cash .stk { display: none; }
+.opsb { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.opsb .hint { margin: 0; color: var(--crit); }
+button.primary { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 600; }
+button.sec { background: var(--surface-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; }
+button.link { background: none; border: 0; color: var(--accent); padding: 2px 6px; font-size: 13px; }
+button.link.danger { color: var(--crit); }
+.qrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+.qrow > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.qrow > span:last-child { flex: none; }
+.qrow.todo > span:first-child { color: var(--warn); }
+#ops-setup { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+#ops-setup summary { cursor: pointer; color: var(--text-2); font-size: 13px; }
+#ops-setup .steps { font-size: 13px; color: var(--text-2); padding-left: 20px; }
+#ops-setup .steps li { margin-bottom: 4px; }
+#ops-toast { position: fixed; right: 16px; bottom: 16px; left: auto; max-width: min(420px, calc(100vw - 32px)); z-index: 50;
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px;
+  padding: 10px 34px 10px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.16); font-size: 13px; display: none; }
+#ops-toast.on { display: block; }
+#ops-toast.ok { border-left-color: var(--ok); }
+#ops-toast.bad { border-left-color: var(--crit); }
+#ops-toast div { color: var(--text-2); margin-top: 2px; }
+#ops-toast .x { position: absolute; top: 6px; right: 6px; border: 0; background: none; color: var(--text-3); font-size: 16px; }
+@media (max-width: 640px) {
+  .opsf { grid-template-columns: 1fr 1fr; }
+  .opsf .w2 { grid-column: 1 / -1; }
+}

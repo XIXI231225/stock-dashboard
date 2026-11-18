@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/runner/work/stock-dashboard/stock-dashboard/run_daily.py", line 313, in main
+    res = run_daily(a)
+          ^^^^^^^^^^^^
+  File "/home/runner/work/stock-dashboard/stock-dashboard/run_daily.py", line 173, in run_daily
+    cal = fetch.trade_calendar(last, log)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/stock-dashboard/stock-dashboard/engine/fetch.py", line 105, in trade_calendar
+    raise FetchError("拿不到交易日历")
+engine.fetch.FetchError: 拿不到交易日历
